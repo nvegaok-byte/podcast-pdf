@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <title>PodcastPDF 🎙️</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;background:#0a0a0f}
+    body{font-family:'DM Sans',sans-serif;color:#f0f0f5;overflow-x:hidden}
+
+    :root{
+      --accent:#e8ff47;
+      --accent2:#ff6b6b;
+      --surface:#13131a;
+      --surface2:#1c1c27;
+      --border:rgba(255,255,255,0.07);
+      --text-dim:#666680;
+      --text-mid:#9999b8;
+    }
+
+    .app{min-height:100dvh;background:#0a0a0f;display:flex;flex-direction:column;align-items:center;position:relative}
+
+    /* glows */
+    .g{position:fixed;border-radius:50%;pointer-events:none;filter:blur(100px);opacity:.25}
+    .g1{width:500px;height:500px;background:#4a00e0;top:-200px;left:-150px}
+    .g2{width:350px;height:350px;background:#e0004a;bottom:50px;right:-100px;opacity:.15}
+
+    /* ════════ UPLOAD ════════ */
+    #s-upload{
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      padding:40px 24px;width:100%;max-width:500px;margin:0 auto;
+      gap:28px;min-height:100dvh
+    }
+
+    .brand{text-align:center}
+    .brand-chip{
+      display:inline-flex;align-items:center;gap:8px;
+      background:rgba(232,255,71,0.08);border:1px solid rgba(232,255,71,0.2);
+      border-radius:50px;padding:6px 16px;margin-bottom:20px;
+      font-family:'Syne',sans-serif;font-size:0.75rem;color:var(--accent);letter-spacing:1px
+    }
+    .brand h1{
+      font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;
+      line-height:1.1;color:#fff;margin-bottom:10px
+    }
+    .brand h1 em{font-style:italic;font-family:'Instrument Serif',serif;color:var(--accent);font-weight:400}
+    .brand p{color:var(--text-mid);font-size:0.9rem;line-height:1.65;max-width:340px}
+
+    .drop{
+      width:100%;border:1.5px dashed rgba(232,255,71,0.25);border-radius:22px;
+      padding:44px 24px;text-align:center;cursor:pointer;
+      background:rgba(232,255,71,0.03);transition:all .25s
+    }
+    .drop.over,.drop:active{border-color:var(--accent);background:rgba(232,255,71,0.07);transform:scale(1.01)}
+    .drop-emoji{font-size:3rem;margin-bottom:14px;display:block}
+    .drop h3{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:6px}
+    .drop p{color:var(--text-dim);font-size:0.83rem}
+
+    .btn-main{
+      display:inline-block;margin-top:18px;
+      padding:14px 36px;background:var(--accent);color:#0a0a0f;
+      border:none;border-radius:50px;font-family:'Syne',sans-serif;
+      font-size:0.9rem;font-weight:700;cursor:pointer;
+      box-shadow:0 4px 24px rgba(232,255,71,.3);transition:all .2s;
+      -webkit-tap-highlight-color:transparent
+    }
+    .btn-main:active{transform:scale(.97)}
+    .upload-note{color:var(--text-dim);font-size:0.75rem;text-align:center}
+
+    /* ════════ PROCESSING ════════ */
+    #s-processing{
+      display:none;flex-direction:column;align-items:center;justify-content:center;
+      padding:40px 24px;text-align:center;gap:20px;min-height:100dvh;width:100%
+    }
+    .pulse-ring{
+      width:80px;height:80px;position:relative;margin-bottom:8px
+    }
+    .pulse-ring::before,.pulse-ring::after{
+      content:'';position:absolute;inset:0;border-radius:50%;
+      border:2px solid var(--accent);animation:pulse-out 1.8s ease-out infinite
+    }
+    .pulse-ring::after{animation-delay:.6s}
+    .pulse-ring .mic{
+      position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+      font-size:2rem
+    }
+    @keyframes pulse-out{0%{transform:scale(.6);opacity:.8}100%{transform:scale(1.4);opacity:0}}
+    #s-processing h3{font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:700;color:#fff}
+    #s-processing p{color:var(--text-mid);font-size:.88rem;max-width:280px;line-height:1.6}
+    #proc-step{color:var(--accent);font-size:.78rem;font-family:'Syne',sans-serif;letter-spacing:.5px;margin-top:4px}
+    .prog-bar{width:100%;max-width:260px;height:3px;background:rgba(255,255,255,.08);border-radius:100px;overflow:hidden}
+    .prog-fill{height:100%;background:var(--accent);border-radius:100px;width:0%;transition:width .5s ease}
+
+    /* ════════ SELECT ════════ */
+    #s-select{
+      display:none;flex-direction:column;width:100%;max-width:500px;
+      margin:0 auto;min-height:100dvh
+    }
+    .sel-header{
+      padding:20px 20px 0;position:sticky;top:0;
+      background:linear-gradient(180deg,#0a0a0f 80%,transparent);z-index:10
+    }
+    .sel-header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .sel-title{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:#fff}
+    .sel-subtitle{color:var(--text-dim);font-size:0.78rem;margin-top:2px}
+    .chip-row{display:flex;gap:8px;flex-wrap:wrap;padding-bottom:14px}
+    .chip{
+      padding:5px 14px;border-radius:50px;font-size:0.78rem;font-family:'Syne',sans-serif;
+      border:1px solid var(--border);background:var(--surface2);color:var(--text-mid);
+      cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent
+    }
+    .chip.active{background:rgba(232,255,71,.1);border-color:rgba(232,255,71,.4);color:var(--accent)}
+
+    .sections-list{padding:0 20px 160px;overflow-y:auto}
+
+    .section-card{
+      background:var(--surface);border:1px solid var(--border);
+      border-radius:16px;padding:16px;margin-bottom:12px;
+      cursor:pointer;transition:all .2s;position:relative;overflow:hidden;
+      -webkit-tap-highlight-color:transparent
+    }
+    .section-card.selected{border-color:rgba(232,255,71,.5);background:rgba(232,255,71,.04)}
+    .section-card.selected::before{
+      content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+      background:var(--accent);border-radius:3px 0 0 3px
+    }
+    .sec-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px}
+    .sec-num{
+      font-family:'Syne',sans-serif;font-size:0.68rem;font-weight:700;
+      color:var(--text-dim);letter-spacing:1px;flex-shrink:0;margin-top:2px
+    }
+    .sec-title{font-family:'Syne',sans-serif;font-size:.9rem;font-weight:600;color:#fff;flex:1}
+    .sec-check{
+      width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border);
+      flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .2s
+    }
+    .section-card.selected .sec-check{background:var(--accent);border-color:var(--accent)}
+    .sec-preview{color:var(--text-dim);font-size:.8rem;line-height:1.55;
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .sec-words{
+      display:inline-block;margin-top:8px;font-size:.7rem;color:var(--text-dim);
+      background:rgba(255,255,255,.04);padding:2px 8px;border-radius:50px
+    }
+
+    .sel-footer{
+      position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+      width:100%;max-width:500px;
+      background:rgba(10,10,15,.97);backdrop-filter:blur(20px);
+      border-top:1px solid var(--border);padding:16px 20px 36px;z-index:20
+    }
+    .sel-footer-info{
+      display:flex;justify-content:space-between;align-items:center;margin-bottom:12px
+    }
+    .sel-count{font-family:'Syne',sans-serif;font-size:.82rem;color:var(--text-mid)}
+    .sel-count b{color:var(--accent)}
+    .btn-generate{
+      width:100%;padding:15px;background:var(--accent);color:#0a0a0f;
+      border:none;border-radius:14px;font-family:'Syne',sans-serif;
+      font-size:.95rem;font-weight:700;cursor:pointer;
+      box-shadow:0 4px 24px rgba(232,255,71,.25);transition:all .2s;
+      -webkit-tap-highlight-color:transparent
+    }
+    .btn-generate:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+    .btn-generate:not(:disabled):active{transform:scale(.98)}
+
+    /* ════════ PLAYER ════════ */
+    #s-player{
+      display:none;flex-direction:column;width:100%;max-width:500px;
+      margin:0 auto;min-height:100dvh
+    }
+
+    .p-topbar{
+      position:fixed;top:0;left:50%;transform:translateX(-50%);
+      width:100%;max-width:500px;
+      padding:14px 20px;
+      background:linear-gradient(180deg,#0a0a0f 75%,transparent);
+      z-index:20;display:flex;align-items:center;justify-content:space-between
+    }
+    .p-back{
+      background:rgba(255,255,255,.06);border:none;color:var(--text-mid);
+      border-radius:50px;padding:6px 14px;font-family:'DM Sans',sans-serif;
+      font-size:.78rem;cursor:pointer;-webkit-tap-highlight-color:transparent;
+      display:flex;align-items:center;gap:5px
+    }
+    .p-doc-name{font-size:.78rem;color:var(--text-dim);max-width:180px;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+    .p-scroll{flex:1;overflow-y:auto;padding:70px 20px 210px;scrollbar-width:none}
+    .p-scroll::-webkit-scrollbar{display:none}
+
+    /* NOW PLAYING card */
+    .now-card{
+      background:linear-gradient(135deg,rgba(232,255,71,.07),rgba(74,0,224,.1));
+      border:1px solid rgba(232,255,71,.15);border-radius:20px;
+      padding:20px;margin-bottom:20px
+    }
+    .now-label{
+      font-family:'Syne',sans-serif;font-size:.65rem;font-weight:700;
+      color:var(--accent);letter-spacing:2px;margin-bottom:8px;
+      display:flex;align-items:center;gap:6px
+    }
+    .dot-live{width:6px;height:6px;border-radius:50%;background:var(--accent);
+      animation:blink 1s ease infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+    .now-title{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:#fff;margin-bottom:6px}
+    .now-text{
+      font-family:'Instrument Serif',serif;font-size:1.05rem;line-height:1.8;
+      color:#e0e0f0;font-style:italic
+    }
+
+    /* Para items */
+    .p-item{
+      padding:12px 16px;border-radius:14px;margin-bottom:10px;
+      font-size:.92rem;line-height:1.8;color:var(--text-dim);
+      transition:all .3s;border-left:3px solid transparent;
+      cursor:pointer;font-weight:300
+    }
+    .p-item.active{color:#f0f0f5;background:rgba(255,255,255,.04);border-left-color:var(--accent)}
+    .p-item.past{color:#333348}
+    .p-item-label{
+      font-family:'Syne',sans-serif;font-size:.62rem;font-weight:700;
+      color:var(--text-dim);letter-spacing:1px;margin-bottom:4px
+    }
+    .p-item.active .p-item-label{color:var(--accent)}
+
+    /* Player bar */
+    .p-bar{
+      position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+      width:100%;max-width:500px;
+      background:rgba(10,10,15,.97);backdrop-filter:blur(24px);
+      border-top:1px solid var(--border);padding:14px 22px 38px;z-index:20
+    }
+    .p-prog{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+    .p-track{
+      flex:1;height:3px;background:rgba(255,255,255,.08);border-radius:100px;
+      cursor:pointer;position:relative
+    }
+    .p-fill{height:100%;background:var(--accent);border-radius:100px;width:0%;transition:width .3s}
+    .p-time{font-size:.7rem;color:var(--text-dim);min-width:30px}
+
+    .p-controls{display:flex;align-items:center;justify-content:space-between}
+
+    .p-rate{
+      background:rgba(232,255,71,.1);border:1px solid rgba(232,255,71,.2);
+      border-radius:50px;padding:5px 13px;font-size:.75rem;
+      color:var(--accent);cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;
+      -webkit-tap-highlight-color:transparent
+    }
+    .p-icon-btn{
+      background:none;border:none;color:var(--text-mid);padding:8px;
+      border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;
+      -webkit-tap-highlight-color:transparent;transition:color .2s
+    }
+    .p-icon-btn:active{color:#fff;background:rgba(255,255,255,.07)}
+    .p-play{
+      width:60px;height:60px;background:var(--accent);border-radius:50%;
+      border:none;color:#0a0a0f;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 4px 20px rgba(232,255,71,.4);transition:transform .15s;
+      -webkit-tap-highlight-color:transparent
+    }
+    .p-play:active{transform:scale(.93)}
+    .p-settings-btn{
+      background:rgba(255,255,255,.06);border:none;color:var(--text-mid);
+      border-radius:50%;width:38px;height:38px;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      -webkit-tap-highlight-color:transparent
+    }
+
+    /* Settings sheet */
+    #settings-ov{
+      display:none;position:fixed;inset:0;
+      background:rgba(0,0,0,.7);z-index:40;
+      align-items:flex-end;justify-content:center
+    }
+    #settings-ov.open{display:flex}
+    .sheet{
+      width:100%;max-width:500px;background:#12121c;
+      border-radius:24px 24px 0 0;padding:20px 24px 50px;
+      border-top:1px solid rgba(232,255,71,.15)
+    }
+    .sheet-handle{width:36px;height:3px;background:rgba(255,255,255,.15);border-radius:2px;margin:0 auto 22px}
+    .sheet-title{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:#fff;margin-bottom:22px}
+    .s-row{margin-bottom:22px}
+    .s-lbl{display:flex;justify-content:space-between;font-size:.83rem;color:var(--text-mid);margin-bottom:10px}
+    .s-lbl span:last-child{color:var(--accent);font-weight:600}
+    input[type=range]{
+      width:100%;-webkit-appearance:none;height:4px;border-radius:100px;outline:none;
+      background:linear-gradient(90deg,var(--accent) var(--pct,33%),rgba(255,255,255,.1) var(--pct,33%))
+    }
+    input[type=range]::-webkit-slider-thumb{
+      -webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+      background:#fff;box-shadow:0 2px 8px rgba(232,255,71,.4);cursor:pointer
+    }
+    .v-select{
+      width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(232,255,71,.15);
+      border-radius:10px;color:#e0e0f0;padding:10px 14px;
+      font-family:'DM Sans',sans-serif;font-size:.88rem;outline:none;-webkit-appearance:none
+    }
+    .v-select option{background:#12121c}
+    .sheet-btn{
+      width:100%;padding:13px;background:var(--accent);color:#0a0a0f;
+      border:none;border-radius:12px;font-family:'Syne',sans-serif;
+      font-size:.9rem;font-weight:700;cursor:pointer;margin-top:6px
+    }
+
+    /* Error */
+    #s-error{
+      display:none;flex-direction:column;align-items:center;justify-content:center;
+      padding:40px 24px;text-align:center;gap:14px;min-height:100dvh;width:100%
+    }
+    #s-error h3{font-family:'Syne',sans-serif;font-size:1.2rem;color:var(--accent2)}
+    #s-error p{color:var(--text-mid);font-size:.88rem;max-width:300px;line-height:1.6}
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="g g1"></div>
+  <div class="g g2"></div>
+
+  <!-- ── UPLOAD ── -->
+  <div id="s-upload">
+    <div class="brand">
+      <div class="brand-chip">🎙️ PODCAST PDF</div>
+      <h1>Tu PDF como<br/><em>podcast</em></h1>
+      <p>Subí un PDF, elegí qué partes querés escuchar, y lo convertimos en audio con tono natural de podcast.</p>
+    </div>
+    <div class="drop" id="drop-zone">
+      <span class="drop-emoji">📄</span>
+      <h3>Subí tu PDF</h3>
+      <p>Tocá acá o arrastrá el archivo</p>
+      <button class="btn-main" id="btn-select">Elegir PDF</button>
+    </div>
+    <p class="upload-note">PDF hasta 10 MB · Necesita conexión a internet</p>
+    <input type="file" id="file-input" accept="application/pdf" style="display:none"/>
+  </div>
+
+  <!-- ── PROCESSING ── -->
+  <div id="s-processing">
+    <div class="pulse-ring"><div class="mic">🎙️</div></div>
+    <h3>Preparando tu podcast...</h3>
+    <p id="proc-msg">Analizando el contenido del PDF</p>
+    <div id="proc-step">PASO 1 DE 2</div>
+    <div class="prog-bar"><div class="prog-fill" id="prog-fill"></div></div>
+  </div>
+
+  <!-- ── SELECT ── -->
+  <div id="s-select">
+    <div class="sel-header">
+      <div class="sel-header-top">
+        <div>
+          <div class="sel-title">¿Qué querés escuchar?</div>
+          <div class="sel-subtitle" id="sel-subtitle">Elegí las secciones</div>
+        </div>
+        <button class="chip" id="btn-reset-sel" onclick="resetToUpload()">✕ Nuevo</button>
+      </div>
+      <div class="chip-row">
+        <button class="chip" onclick="selectAll()">Seleccionar todo</button>
+        <button class="chip" onclick="selectNone()">Ninguno</button>
+      </div>
+    </div>
+    <div class="sections-list" id="sections-list"></div>
+    <div class="sel-footer">
+      <div class="sel-footer-info">
+        <span class="sel-count"><b id="sel-num">0</b> secciones seleccionadas</span>
+        <span class="sel-count" id="sel-words" style="color:var(--text-dim)"></span>
+      </div>
+      <button class="btn-generate" id="btn-generate" disabled onclick="generatePodcast()">
+        🎙️ Generar podcast
+      </button>
+    </div>
+  </div>
+
+  <!-- ── PLAYER ── -->
+  <div id="s-player">
+    <div class="p-topbar">
+      <button class="p-back" onclick="goToSelect()">← Secciones</button>
+      <span class="p-doc-name" id="p-doc-name"></span>
+      <button class="p-settings-btn" onclick="openSettings()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+      </button>
+    </div>
+
+    <div class="p-scroll" id="p-scroll">
+      <div class="now-card" id="now-card" style="display:none">
+        <div class="now-label"><span class="dot-live"></span> REPRODUCIENDO AHORA</div>
+        <div class="now-title" id="now-title"></div>
+        <div class="now-text" id="now-text"></div>
+      </div>
+      <div id="p-items"></div>
+    </div>
+
+    <div class="p-bar">
+      <div class="p-prog">
+        <span class="p-time" id="p-elapsed">0:00</span>
+        <div class="p-track"><div class="p-fill" id="p-fill"></div></div>
+        <span class="p-time" id="p-counter" style="text-align:right">0/0</span>
+      </div>
+      <div class="p-controls">
+        <button class="p-rate" id="btn-rate" onclick="cycleRate()">1×</button>
+        <button class="p-icon-btn" onclick="skipItem(-1)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+        </button>
+        <button class="p-play" id="btn-play" onclick="togglePlay()">
+          <svg id="ico-play" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="margin-left:3px"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="ico-pause" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        </button>
+        <button class="p-icon-btn" onclick="skipItem(1)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+        </button>
+        <button class="p-icon-btn" onclick="restart()">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ERROR ── -->
+  <div id="s-error">
+    <div style="font-size:3rem">🎙️</div>
+    <h3>Algo salió mal</h3>
+    <p id="err-msg"></p>
+    <button class="btn-main" onclick="resetToUpload()">Empezar de nuevo</button>
+  </div>
+
+  <!-- ── SETTINGS ── -->
+  <div id="settings-ov">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Ajustes de voz</div>
+      <div class="s-row">
+        <div class="s-lbl"><span>Velocidad</span><span id="lbl-rate">1×</span></div>
+        <input type="range" id="rng-rate" min="0.5" max="2" step="0.25" value="1"/>
+      </div>
+      <div class="s-row">
+        <div class="s-lbl"><span>Tono</span><span id="lbl-pitch">1.0</span></div>
+        <input type="range" id="rng-pitch" min="0.5" max="2" step="0.1" value="1"/>
+      </div>
+      <div class="s-row" id="voice-row">
+        <div class="s-lbl"><span>Voz</span></div>
+        <select class="v-select" id="voice-sel"></select>
+      </div>
+      <button class="sheet-btn" onclick="closeSettings()">Listo</button>
+    </div>
+  </div>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let rawSections = [];      // [{title, text, words}]
+let podcastItems = [];     // [{sectionTitle, podcastText}]
+let selected = new Set();
+let currentItem = 0;
+let isPlaying = false;
+let rate = 1.0, pitch = 1.0;
+let voices = [], selectedVoice = null;
+let elapsed = 0, startTs = null, timerInt = null;
+let pdfName = "";
+
+// ── Screens ───────────────────────────────────────────────────────────────────
+function show(id) {
+  ["s-upload","s-processing","s-select","s-player","s-error"].forEach(s => {
+    document.getElementById(s).style.display = s === id ? "flex" : "none";
+  });
+}
+function setProgress(pct, msg, step) {
+  document.getElementById("prog-fill").style.width = pct + "%";
+  if (msg) document.getElementById("proc-msg").textContent = msg;
+  if (step) document.getElementById("proc-step").textContent = step;
+}
+
+// ── Upload / Extract ──────────────────────────────────────────────────────────
+document.getElementById("btn-select").addEventListener("click", e => { e.stopPropagation(); document.getElementById("file-input").click(); });
+document.getElementById("drop-zone").addEventListener("click", () => document.getElementById("file-input").click());
+document.getElementById("file-input").addEventListener("change", e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+const dz = document.getElementById("drop-zone");
+dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("over"); });
+dz.addEventListener("dragleave", () => dz.classList.remove("over"));
+dz.addEventListener("drop", e => { e.preventDefault(); dz.classList.remove("over"); handleFile(e.dataTransfer.files[0]); });
+
+async function handleFile(file) {
+  if (!file || file.type !== "application/pdf") return showError("Necesitás subir un archivo PDF válido.");
+  if (file.size > 10 * 1024 * 1024) return showError("El PDF es demasiado grande. Máximo 10 MB.");
+  pdfName = file.name.replace(".pdf","");
+  document.getElementById("p-doc-name").textContent = "📄 " + pdfName;
+  show("s-processing");
+  setProgress(5, "Abriendo el PDF...", "PASO 1 DE 2 · EXTRAYENDO TEXTO");
+  try {
+    const ab = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+    let pages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const pg = await pdf.getPage(i);
+      const ct = await pg.getTextContent();
+      pages.push(ct.items.map(x => x.str).join(" "));
+      setProgress(5 + Math.round((i / pdf.numPages) * 40), `Leyendo página ${i} de ${pdf.numPages}...`);
+    }
+    const fullText = pages.join("\n\n");
+    if (!fullText.trim()) return showError("No se encontró texto legible. El PDF puede ser una imagen escaneada.");
+
+    setProgress(50, "Analizando estructura del documento...", "PASO 2 DE 2 · DETECTANDO SECCIONES");
+    rawSections = await detectSections(fullText);
+    setProgress(100, "¡Listo!");
+    renderSelectScreen();
+    show("s-select");
+  } catch(err) {
+    showError("No se pudo procesar el PDF. " + (err.message || ""));
+  }
+}
+
+// ── Detect sections via Claude ────────────────────────────────────────────────
+async function detectSections(text) {
+  const truncated = text.slice(0, 12000);
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 3000,
+      messages: [{
+        role: "user",
+        content: `Analizá este texto y dividilo en secciones temáticas lógicas (entre 3 y 12 secciones según la longitud).
+
+Para cada sección devolvé un objeto JSON con:
+- "title": título corto y descriptivo (máx 6 palabras)
+- "text": el texto de esa sección (mínimo 2 oraciones)
+
+Respondé SOLO con un array JSON válido, sin backticks ni texto adicional.
+
+TEXTO:
+${truncated}`
+      }]
+    })
+  });
+  if (!res.ok) throw new Error("Error al analizar el documento");
+  const data = await res.json();
+  let raw = data.content.find(b => b.type === "text")?.text || "[]";
+  raw = raw.replace(/```json|```/g, "").trim();
+  const sections = JSON.parse(raw);
+  return sections.map(s => ({
+    title: s.title || "Sección",
+    text: s.text || "",
+    words: (s.text || "").split(/\s+/).length
+  }));
+}
+
+// ── Select screen ─────────────────────────────────────────────────────────────
+function renderSelectScreen() {
+  selected.clear();
+  rawSections.forEach((_, i) => selected.add(i));
+  document.getElementById("sel-subtitle").textContent = `${pdfName} · ${rawSections.length} secciones`;
+  renderCards();
+  updateSelCount();
+}
+
+function renderCards() {
+  const list = document.getElementById("sections-list");
+  list.innerHTML = "";
+  rawSections.forEach((sec, i) => {
+    const div = document.createElement("div");
+    div.className = "section-card" + (selected.has(i) ? " selected" : "");
+    div.id = "sec-card-" + i;
+    div.innerHTML = `
+      <div class="sec-top">
+        <span class="sec-num">SECCIÓN ${i + 1}</span>
+        <span class="sec-title">${sec.title}</span>
+        <div class="sec-check">${selected.has(i) ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="#0a0a0f"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : ''}</div>
+      </div>
+      <div class="sec-preview">${sec.text.slice(0, 140)}...</div>
+      <span class="sec-words">~${sec.words} palabras</span>
+    `;
+    div.addEventListener("click", () => toggleSection(i));
+    list.appendChild(div);
+  });
+}
+
+function toggleSection(i) {
+  if (selected.has(i)) selected.delete(i);
+  else selected.add(i);
+  const card = document.getElementById("sec-card-" + i);
+  card.className = "section-card" + (selected.has(i) ? " selected" : "");
+  card.querySelector(".sec-check").innerHTML = selected.has(i)
+    ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="#0a0a0f"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
+    : '';
+  updateSelCount();
+}
+
+function selectAll() { rawSections.forEach((_, i) => selected.add(i)); renderCards(); updateSelCount(); }
+function selectNone() { selected.clear(); renderCards(); updateSelCount(); }
+
+function updateSelCount() {
+  const n = selected.size;
+  const words = [...selected].reduce((acc, i) => acc + rawSections[i].words, 0);
+  document.getElementById("sel-num").textContent = n;
+  document.getElementById("sel-words").textContent = n > 0 ? `~${words} palabras` : "";
+  document.getElementById("btn-generate").disabled = n === 0;
+}
+
+// ── Generate podcast ──────────────────────────────────────────────────────────
+async function generatePodcast() {
+  const chosenSections = rawSections.filter((_, i) => selected.has(i));
+  show("s-processing");
+  setProgress(10, "Preparando el guión del podcast...", "GENERANDO AUDIO NATURAL");
+
+  try {
+    podcastItems = [];
+    for (let i = 0; i < chosenSections.length; i++) {
+      setProgress(
+        10 + Math.round((i / chosenSections.length) * 85),
+        `Escribiendo sección ${i + 1} de ${chosenSections.length}...`,
+        `SECCIÓN ${i + 1} DE ${chosenSections.length}`
+      );
+      const podcast = await rewriteAsPodcast(chosenSections[i], i === 0, i === chosenSections.length - 1);
+      podcastItems.push({ sectionTitle: chosenSections[i].title, podcastText: podcast });
+    }
+    setProgress(100, "¡Listo para escuchar!");
+    renderPlayer();
+    show("s-player");
+  } catch(err) {
+    showError("Error al generar el podcast. " + (err.message || ""));
+  }
+}
+
+async function rewriteAsPodcast(section, isFirst, isLast) {
+  const systemPrompt = `Sos un locutor de podcast latinoamericano carismático y cercano. Tu trabajo es tomar texto de un documento y convertirlo en un fragmento de podcast fluido, natural y entretenido.
+
+ESTILO:
+- Hablá como si estuvieras conversando con alguien inteligente frente al micrófono
+- Usá español latinoamericano natural (no "vosotros", usá "ustedes")
+- Conectá las ideas con frases de transición naturales ("mirá, lo que pasa es que...", "y acá viene lo interesante...", "pensá en esto un momento...")
+- Podés agregar pequeñas reflexiones o analogías para hacer el contenido más vívido
+- NO uses listas ni viñetas — todo fluye como conversación oral
+- Mantené el contenido fiel al original pero con vida
+- Longitud: similar al original, no lo alargues demasiado
+${isFirst ? '- Es la primera sección: arrancá con energía, como si empezaras el episodio' : ''}
+${isLast ? '- Es la última sección: cerrá con una reflexión final natural' : ''}
+
+Respondé SOLO con el texto del podcast, sin títulos ni aclaraciones.`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: [{
+        role: "user",
+        content: `Sección: "${section.title}"\n\n${section.text}`
+      }]
+    })
+  });
+  if (!res.ok) throw new Error("Error en la API");
+  const data = await res.json();
+  return data.content.find(b => b.type === "text")?.text || section.text;
+}
+
+// ── Player ────────────────────────────────────────────────────────────────────
+function renderPlayer() {
+  currentItem = 0; isPlaying = false; elapsed = 0;
+  stopTimer();
+
+  const container = document.getElementById("p-items");
+  container.innerHTML = "";
+  podcastItems.forEach((item, i) => {
+    const div = document.createElement("div");
+    div.className = "p-item";
+    div.id = "pitem-" + i;
+    div.innerHTML = `<div class="p-item-label">SECCIÓN ${i+1} · ${item.sectionTitle.toUpperCase()}</div>${item.podcastText}`;
+    div.addEventListener("click", () => {
+      currentItem = i;
+      window.speechSynthesis.cancel();
+      if (isPlaying) speakFrom(i);
+      else updatePlayer();
+    });
+    container.appendChild(div);
+  });
+  updatePlayer();
+}
+
+function goToSelect() {
+  window.speechSynthesis.cancel();
+  stopTimer();
+  isPlaying = false;
+  show("s-select");
+}
+
+function speakFrom(index) {
+  window.speechSynthesis.cancel();
+  if (index >= podcastItems.length) {
+    isPlaying = false; stopTimer(); currentItem = 0; elapsed = 0; updatePlayer(); return;
+  }
+  currentItem = index;
+  updatePlayer();
+
+  const u = new SpeechSynthesisUtterance(podcastItems[index].podcastText);
+  u.rate = rate; u.pitch = pitch;
+  u.lang = selectedVoice ? selectedVoice.lang : "es-AR";
+  if (selectedVoice) u.voice = selectedVoice;
+  u.onend = () => speakFrom(index + 1);
+  u.onerror = e => { if (e.error !== "interrupted") { isPlaying = false; stopTimer(); updatePlayer(); } };
+  window.speechSynthesis.speak(u);
+}
+
+function togglePlay() {
+  if (isPlaying) {
+    window.speechSynthesis.pause(); isPlaying = false; stopTimer();
+  } else {
+    if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+    else speakFrom(currentItem);
+    isPlaying = true; startTimer();
+  }
+  updatePlayer();
+}
+
+function skipItem(dir) {
+  const next = Math.max(0, Math.min(podcastItems.length - 1, currentItem + dir));
+  window.speechSynthesis.cancel();
+  currentItem = next;
+  if (isPlaying) speakFrom(next);
+  updatePlayer();
+}
+
+function restart() {
+  window.speechSynthesis.cancel(); stopTimer();
+  currentItem = 0; isPlaying = false; elapsed = 0;
+  document.getElementById("p-elapsed").textContent = "0:00";
+  updatePlayer();
+}
+
+function cycleRate() {
+  const rs = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+  const i = rs.indexOf(rate);
+  rate = rs[(i + 1) % rs.length];
+  document.getElementById("btn-rate").textContent = rate + "×";
+  document.getElementById("lbl-rate").textContent = rate + "×";
+  document.getElementById("rng-rate").value = rate;
+  setSliderPct("rng-rate", (rate - 0.5) / 1.5);
+  if (isPlaying) { window.speechSynthesis.cancel(); speakFrom(currentItem); }
+}
+
+function updatePlayer() {
+  document.getElementById("ico-play").style.display = isPlaying ? "none" : "block";
+  document.getElementById("ico-pause").style.display = isPlaying ? "block" : "none";
+
+  const pct = podcastItems.length ? (currentItem / podcastItems.length) * 100 : 0;
+  document.getElementById("p-fill").style.width = pct + "%";
+  document.getElementById("p-counter").textContent = `${currentItem + 1}/${podcastItems.length}`;
+
+  // Now playing card
+  const nc = document.getElementById("now-card");
+  if (podcastItems.length > 0 && isPlaying) {
+    nc.style.display = "block";
+    document.getElementById("now-title").textContent = podcastItems[currentItem].sectionTitle;
+    const preview = podcastItems[currentItem].podcastText.slice(0, 200) + "...";
+    document.getElementById("now-text").textContent = preview;
+  } else {
+    nc.style.display = "none";
+  }
+
+  // Para items
+  podcastItems.forEach((_, i) => {
+    const el = document.getElementById("pitem-" + i);
+    if (!el) return;
+    el.className = "p-item" + (i === currentItem ? " active" : i < currentItem ? " past" : "");
+  });
+
+  const active = document.getElementById("pitem-" + currentItem);
+  if (active) active.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+// ── Timer ─────────────────────────────────────────────────────────────────────
+function startTimer() {
+  startTs = Date.now();
+  timerInt = setInterval(() => {
+    elapsed += (Date.now() - startTs) / 1000;
+    startTs = Date.now();
+    const m = Math.floor(elapsed / 60), s = Math.floor(elapsed % 60);
+    document.getElementById("p-elapsed").textContent = `${m}:${s.toString().padStart(2,"0")}`;
+  }, 500);
+}
+function stopTimer() { clearInterval(timerInt); startTs = null; }
+
+// ── Voices ────────────────────────────────────────────────────────────────────
+function loadVoices() {
+  const all = window.speechSynthesis.getVoices();
+  const esp = all.filter(v => v.lang.startsWith("es"));
+  voices = esp.length ? esp : all;
+  const sel = document.getElementById("voice-sel");
+  sel.innerHTML = "";
+  voices.forEach(v => {
+    const opt = document.createElement("option");
+    opt.value = v.name; opt.textContent = `${v.name} (${v.lang})`; sel.appendChild(opt);
+  });
+  if (!selectedVoice) {
+    selectedVoice = esp.find(v => v.lang === "es-AR") || esp.find(v => v.lang === "es-MX") || esp[0] || all[0];
+    if (selectedVoice) sel.value = selectedVoice.name;
+  }
+}
+window.speechSynthesis.onvoiceschanged = loadVoices;
+loadVoices();
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+function openSettings() { document.getElementById("settings-ov").classList.add("open"); }
+function closeSettings() { document.getElementById("settings-ov").classList.remove("open"); }
+document.getElementById("settings-ov").addEventListener("click", closeSettings);
+
+function setSliderPct(id, ratio) {
+  document.getElementById(id).style.setProperty("--pct", Math.round(ratio * 100) + "%");
+}
+
+document.getElementById("rng-rate").addEventListener("input", e => {
+  rate = parseFloat(e.target.value);
+  document.getElementById("lbl-rate").textContent = rate + "×";
+  document.getElementById("btn-rate").textContent = rate + "×";
+  setSliderPct("rng-rate", (rate - 0.5) / 1.5);
+  if (isPlaying) { window.speechSynthesis.cancel(); speakFrom(currentItem); }
+});
+document.getElementById("rng-pitch").addEventListener("input", e => {
+  pitch = parseFloat(e.target.value);
+  document.getElementById("lbl-pitch").textContent = pitch.toFixed(1);
+  setSliderPct("rng-pitch", (pitch - 0.5) / 1.5);
+  if (isPlaying) { window.speechSynthesis.cancel(); speakFrom(currentItem); }
+});
+document.getElementById("voice-sel").addEventListener("change", e => {
+  selectedVoice = voices.find(v => v.name === e.target.value) || null;
+  if (isPlaying) { window.speechSynthesis.cancel(); speakFrom(currentItem); }
+});
+
+// Init sliders
+setSliderPct("rng-rate", 0.33);
+setSliderPct("rng-pitch", 0.33);
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function showError(msg) { document.getElementById("err-msg").textContent = msg; show("s-error"); }
+function resetToUpload() {
+  window.speechSynthesis.cancel(); stopTimer();
+  rawSections = []; podcastItems = []; selected.clear();
+  isPlaying = false; elapsed = 0; currentItem = 0;
+  document.getElementById("file-input").value = "";
+  show("s-upload");
+}
+</script>
+</body>
+</html>
